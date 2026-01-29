@@ -1,0 +1,1 @@
+# adjective-intesity-ladder
