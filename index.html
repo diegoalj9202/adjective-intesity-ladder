@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>The Synonym Ladder</title>
+    <!-- Font -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+    <style>
+        :root {
+            /* Palette */
+            --bg-color: #E6EEF6;
+            --text-color: #4A5568;
+            --primary: #667EEA;
+            --success: #48BB78;
+            --error: #F56565;
+            
+            /* Rung Colors */
+            --rung-basic: #FEEBC8;  /* Soft Orange */
+            --rung-strong: #B2F5EA; /* Soft Teal */
+            --rung-extreme: #E9D8FD; /* Soft Purple */
+
+            /* Claymorphism Shadows */
+            --clay-shadow-out: 8px 8px 16px #D1D9E6, -8px -8px 16px #FFFFFF;
+            --clay-shadow-in: inset 6px 6px 10px #D1D9E6, inset -6px -6px 10px #FFFFFF;
+        }
+
+        * {
+            box-sizing: border-box;
+            user-select: none; /* Prevent text selection */
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* --- Utilities --- */
+        .hidden-view {
+            display: none !important;
+        }
+
+        /* --- Header & Nav --- */
+        header {
+            width: 100%;
+            padding: 20px 20px 10px 20px;
+            text-align: center;
+            max-width: 800px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+
+        h1 {
+            font-weight: 900;
+            font-size: 2rem;
+            margin: 0;
+            color: var(--primary);
+            text-shadow: 2px 2px 0px #fff;
+        }
+
+        .controls-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        .clay-input {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 50px;
+            background: #E6EEF6;
+            box-shadow: var(--clay-shadow-in);
+            font-family: 'Nunito', sans-serif;
+            font-size: 1rem;
+            color: var(--text-color);
+            outline: none;
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+        }
+
+        .clay-input::placeholder { color: #A0AEC0; }
+
+        .ladder-selector {
+            width: 100%;
+            max-width: 350px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 50px;
+            background: #E6EEF6;
+            box-shadow: var(--clay-shadow-out);
+            font-family: 'Nunito', sans-serif;
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-color);
+            outline: none;
+            cursor: pointer;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23667EEA%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 20px top 50%;
+            background-size: 12px auto;
+        }
+
+        /* --- Game Area --- */
+        .game-container {
+            width: 100%;
+            max-width: 600px;
+            flex-grow: 1;
+            padding: 10px 20px 100px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .ladder-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+        }
+        
+        .ladder-container.locked { opacity: 0.9; }
+
+        .rung {
+            background-color: #E6EEF6;
+            border-radius: 20px;
+            padding: 15px;
+            min-height: 100px;
+            position: relative;
+            box-shadow: var(--clay-shadow-in);
+            transition: all 0.3s ease;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            align-content: flex-start;
+            border: 2px solid transparent;
+        }
+
+        .rung.drag-over {
+            border-color: var(--primary);
+            background-color: #edf2f7;
+        }
+
+        .rung::before {
+            content: attr(data-level);
+            position: absolute;
+            top: -10px;
+            left: 20px;
+            background: var(--primary);
+            color: white;
+            font-size: 0.8rem;
+            font-weight: 800;
+            padding: 4px 12px;
+            border-radius: 12px;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            z-index: 2;
+        }
+
+        .rung[data-type="extreme"]::before { background-color: #805AD5; }
+        .rung[data-type="strong"]::before { background-color: #38B2AC; }
+        .rung[data-type="basic"]::before { background-color: #DD6B20; }
+        .rung[data-type="extreme"] { background-color: rgba(233, 216, 253, 0.3); }
+        .rung[data-type="strong"] { background-color: rgba(178, 245, 234, 0.3); }
+        .rung[data-type="basic"] { background-color: rgba(254, 235, 200, 0.3); }
+
+        /* --- Word Pills --- */
+        .word-pill {
+            background-color: #fff;
+            padding: 12px 20px;
+            border-radius: 50px;
+            font-weight: 700;
+            cursor: grab;
+            display: inline-block;
+            box-shadow: 6px 6px 12px #cfd6e0, -6px -6px 12px #ffffff;
+            transition: transform 0.2s, box-shadow 0.2s;
+            touch-action: none;
+            position: relative;
+            z-index: 10;
+        }
+
+        .word-pill:active { cursor: grabbing; }
+        .locked .word-pill { cursor: default; pointer-events: none; }
+        .word-pill.dragging { opacity: 0.5; transform: scale(1.05); }
+        .word-pill.selected { border: 2px solid var(--primary); transform: scale(1.1); box-shadow: var(--clay-shadow-out); z-index: 20; animation: pulse 1s infinite; }
+        .word-pill.correct { background-color: var(--success); color: white; box-shadow: inset 4px 4px 8px rgba(0,0,0,0.1); }
+        .word-pill.incorrect { background-color: var(--error); color: white; animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both; }
+
+        .word-pool-area { margin-top: 10px; }
+        .pool-label { font-size: 0.9rem; color: #718096; margin-bottom: 10px; margin-left: 10px; font-weight: 700; }
+        .word-pool { min-height: 120px; padding: 15px; background: #E6EEF6; border-radius: 20px; box-shadow: var(--clay-shadow-out); display: flex; flex-wrap: wrap; gap: 12px; align-content: flex-start; justify-content: center; }
+
+        /* --- Results View (The "New Tab") --- */
+        #results-view {
+            width: 100%;
+            max-width: 1100px;
+            padding: 20px 20px 100px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 30px;
+        }
+
+        .score-card {
+            background: #E6EEF6;
+            border-radius: 30px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: var(--clay-shadow-out);
+            border: 2px solid #fff;
+        }
+
+        .score-title { font-size: 1.2rem; color: #718096; font-weight: 700; margin-bottom: 10px; }
+        .score-value { font-size: 3.5rem; color: var(--primary); font-weight: 900; line-height: 1; }
+        .score-team { font-size: 1.5rem; color: #2D3748; margin-bottom: 15px; font-weight: 800; }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .result-column {
+            background: #F7FAFC;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: var(--clay-shadow-out);
+            border: 1px solid #fff;
+        }
+
+        .result-header { background: #667EEA; color: white; padding: 10px; font-weight: 800; text-align: center; }
+
+        .result-cell { padding: 10px; border-bottom: 1px solid #E2E8F0; }
+        .result-cell-label { font-size: 0.75rem; text-transform: uppercase; color: #718096; font-weight: 800; margin-bottom: 5px; }
+        .result-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+
+        .res-tag {
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .res-tag.correct { background: #F0FFF4; color: #2F855A; border: 1px solid #48BB78; }
+        .res-tag.incorrect { background: #FFF5F5; color: #C53030; border: 1px solid #F56565; }
+
+        .practice-section {
+            grid-column: 1 / -1;
+            background: #FFF5F5;
+            border: 2px solid #FEB2B2;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: var(--clay-shadow-out);
+        }
+        .practice-title { color: #C53030; font-weight: 800; font-size: 1.2rem; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
+        .practice-list { display: flex; flex-wrap: wrap; gap: 10px; }
+        .practice-item { background: white; color: #C53030; padding: 8px 16px; border-radius: 20px; font-weight: 700; border: 1px solid #FC8181; }
+
+        /* --- Footer & Buttons --- */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            padding: 20px;
+            background: linear-gradient(to top, #E6EEF6 95%, rgba(230,238,246,0));
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .btn {
+            pointer-events: auto;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1rem;
+            font-weight: 800;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            outline: none;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        .btn:active { transform: translateY(2px); }
+        .btn:disabled { background: #CBD5E0; cursor: not-allowed; transform: none; color: #718096; box-shadow: none; }
+
+        .btn-verify { background: var(--primary); color: white; box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4); }
+        .btn-results { background: #805AD5; color: white; box-shadow: 0 10px 20px rgba(128, 90, 213, 0.4); }
+        .btn-download { background: #ED8936; color: white; box-shadow: 0 10px 20px rgba(237, 137, 54, 0.4); }
+
+        /* Animations */
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        @keyframes pulse { 0% { transform: scale(1.1); } 50% { transform: scale(1.15); } 100% { transform: scale(1.1); } }
+
+        /* Mobile */
+        @media (max-width: 600px) {
+            h1 { font-size: 1.5rem; }
+            .rung { min-height: 90px; }
+            .word-pill { padding: 10px 16px; font-size: 0.9rem; }
+            .footer { flex-direction: column; align-items: center; background: #E6EEF6; padding-bottom: 20px; }
+            .btn { width: 100%; max-width: 300px; }
+            .game-container { padding-bottom: 180px; }
+            .score-value { font-size: 2.5rem; }
+            .results-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>The Synonym Ladder</h1>
+        <div id="controls-area" class="controls-row">
+            <input type="text" id="teamName" class="clay-input" placeholder="Enter Team Member Names">
+            <select id="ladderSelect" class="ladder-selector" onchange="changeLadder()">
+                <!-- Options populated by JS -->
+            </select>
+        </div>
+    </header>
+
+    <!-- GAME VIEW -->
+    <div id="game-view" class="game-container">
+        <div id="ladder-area" class="ladder-container">
+            <div id="rung-extreme" class="rung" data-level="Extreme C1" data-type="extreme"></div>
+            <div id="rung-strong" class="rung" data-level="Strong B2" data-type="strong"></div>
+            <div id="rung-basic" class="rung" data-level="Basic A2" data-type="basic"></div>
+        </div>
+
+        <div class="word-pool-area">
+            <div class="pool-label">Drag words or tap to select:</div>
+            <div id="word-pool" class="word-pool"></div>
+        </div>
+    </div>
+
+    <!-- RESULTS VIEW (Initially Hidden) -->
+    <div id="results-view" class="hidden-view">
+        <div class="score-card">
+            <div class="score-team" id="res-team-name">Team: Anonymous</div>
+            <div class="score-title">Final Score</div>
+            <div class="score-value" id="res-score-val">0%</div>
+            <p style="color: #718096; margin-top:10px;">Great effort! Check the sections below for your results.</p>
+        </div>
+        
+        <div class="results-grid" id="results-grid">
+            <!-- Columns and Practice Section injected here -->
+        </div>
+    </div>
+
+    <div class="footer">
+        <button id="btnVerify" class="btn btn-verify" onclick="verifyLadder()">Check Answers</button>
+        <button id="btnResults" class="btn btn-results" onclick="showResultsView()" disabled>View Final Results</button>
+        <button id="btnDownload" class="btn btn-download hidden-view" onclick="downloadReport()">Download Report</button>
+    </div>
+
+    <script>
+        // --- Data Definitions ---
+        const ladders = [
+            { id: 1, title: "Evaluation (Positive)", levels: { basic: ["Good", "Nice"], strong: ["Great", "Wonderful", "Awesome"], extreme: ["Outstanding", "Exceptional", "Superb", "Phenomenal"] } },
+            { id: 2, title: "Evaluation (Negative)", levels: { basic: ["Bad", "Unpleasant"], strong: ["Terrible", "Horrible", "Awful"], extreme: ["Dreadful", "Atrocious", "Abysmal", "Appalling"] } },
+            { id: 3, title: "Intelligence", levels: { basic: ["Smart", "Clever"], strong: ["Intelligent", "Bright", "Sharp"], extreme: ["Brilliant", "Ingenious", "Intellectual", "Astute"] } },
+            { id: 4, title: "Cleanliness & Order", levels: { basic: ["Clean", "Dirty", "Messy"], strong: ["Tidy", "Disorganized", "Untidy"], extreme: ["Immaculate", "Spotless", "Filthy", "Squalid"] } },
+            { id: 5, title: "Personality (Social)", levels: { basic: ["Friendly", "Shy"], strong: ["Outgoing", "Quiet", "Sociable"], extreme: ["Gregarious", "Charismatic", "Introverted", "Withdrawn"] } },
+            { id: 6, title: "Impact & Noise", levels: { basic: ["Loud", "Important"], strong: ["Noisy", "Serious", "Essential"], extreme: ["Deafening", "Ear-splitting", "Crucial", "Vital"] } }
+        ];
+
+        // --- Global State ---
+        let currentLadderIndex = 0;
+        let selectedWord = null;
+        let gameState = [];
+
+        // --- DOM Elements ---
+        const ladderSelect = document.getElementById('ladderSelect');
+        const poolContainer = document.getElementById('word-pool');
+        const rungs = { basic: document.getElementById('rung-basic'), strong: document.getElementById('rung-strong'), extreme: document.getElementById('rung-extreme') };
+        const ladderArea = document.getElementById('ladder-area');
+        const btnVerify = document.getElementById('btnVerify');
+        const btnResults = document.getElementById('btnResults');
+        const btnDownload = document.getElementById('btnDownload');
+        const gameView = document.getElementById('game-view');
+        const resultsView = document.getElementById('results-view');
+        const controlsArea = document.getElementById('controls-area');
+
+        // --- Initialization ---
+        function init() {
+            gameState = ladders.map((ladder) => {
+                const words = [];
+                const add = (list, lvl) => list.forEach(w => words.push({
+                    text: w, level: lvl, id: 'w-' + Math.random().toString(36).substr(2,9),
+                    location: 'pool', status: 'neutral'
+                }));
+                add(ladder.levels.basic, 'basic');
+                add(ladder.levels.strong, 'strong');
+                add(ladder.levels.extreme, 'extreme');
+                words.sort(() => Math.random() - 0.5);
+                return { locked: false, words: words };
+            });
+
+            ladders.forEach((ladder, index) => {
+                const option = document.createElement('option');
+                option.value = index;
+                option.text = (index + 1) + ". " + ladder.title;
+                ladderSelect.appendChild(option);
+            });
+
+            loadLadder(0);
+            setupDropZones();
+        }
+
+        function changeLadder() {
+            loadLadder(parseInt(ladderSelect.value));
+        }
+
+        function loadLadder(index) {
+            currentLadderIndex = index;
+            const state = gameState[index];
+            
+            // Clear Zones
+            Object.values(rungs).forEach(el => el.innerHTML = '');
+            poolContainer.innerHTML = '';
+
+            // Locked Logic
+            if (state.locked) {
+                ladderArea.classList.add('locked');
+                btnVerify.disabled = true;
+                btnVerify.textContent = "Ladder Completed";
+            } else {
+                ladderArea.classList.remove('locked');
+                btnVerify.disabled = false;
+                btnVerify.textContent = "Check Answers";
+            }
+
+            // Render
+            state.words.forEach(wordObj => {
+                const el = createWordElement(wordObj, state.locked);
+                if (state.locked) {
+                    if (wordObj.status === 'correct') el.classList.add('correct');
+                    if (wordObj.status === 'incorrect') el.classList.add('incorrect');
+                }
+                
+                if (wordObj.location === 'pool') poolContainer.appendChild(el);
+                else rungs[wordObj.location].appendChild(el);
+            });
+        }
+
+        function createWordElement(wordObj, isLocked) {
+            const div = document.createElement('div');
+            div.classList.add('word-pill');
+            div.textContent = wordObj.text;
+            div.dataset.id = wordObj.id;
+            
+            if (!isLocked) {
+                div.draggable = true;
+                div.addEventListener('dragstart', handleDragStart);
+                div.addEventListener('dragend', handleDragEnd);
+                div.addEventListener('click', (e) => handleWordClick(e, div));
+            }
+            return div;
+        }
+
+        // --- Drag & Drop ---
+        function updateWordLocation(wordId, newLocation) {
+            const state = gameState[currentLadderIndex];
+            const word = state.words.find(w => w.id === wordId);
+            if (word) {
+                word.location = newLocation;
+                word.status = 'neutral';
+            }
+        }
+
+        function handleDragStart(e) {
+            if (gameState[currentLadderIndex].locked) return;
+            e.dataTransfer.setData('text/plain', e.target.dataset.id);
+            e.target.classList.add('dragging');
+            if (selectedWord) { selectedWord.classList.remove('selected'); selectedWord = null; }
+        }
+        function handleDragEnd(e) { e.target.classList.remove('dragging'); }
+
+        function setupDropZones() {
+            const zones = [
+                { el: rungs.basic, loc: 'basic' },
+                { el: rungs.strong, loc: 'strong' },
+                { el: rungs.extreme, loc: 'extreme' },
+                { el: poolContainer, loc: 'pool' }
+            ];
+            
+            zones.forEach(z => {
+                z.el.addEventListener('dragover', (e) => {
+                    if (gameState[currentLadderIndex].locked) return;
+                    e.preventDefault();
+                    if(z.el !== poolContainer) z.el.classList.add('drag-over');
+                });
+                z.el.addEventListener('dragleave', () => z.el.classList.remove('drag-over'));
+                z.el.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    if (gameState[currentLadderIndex].locked) return;
+                    z.el.classList.remove('drag-over');
+                    const id = e.dataTransfer.getData('text/plain');
+                    const el = document.querySelector(`[data-id="${id}"]`);
+                    if (el) {
+                        z.el.appendChild(el);
+                        resetValidation(el);
+                        updateWordLocation(id, z.loc);
+                    }
+                });
+                z.el.addEventListener('click', (e) => {
+                    if (gameState[currentLadderIndex].locked) return;
+                    if (selectedWord && (e.target === z.el || e.target.classList.contains('rung-label'))) {
+                        z.el.appendChild(selectedWord);
+                        resetValidation(selectedWord);
+                        updateWordLocation(selectedWord.dataset.id, z.loc);
+                        selectedWord.classList.remove('selected');
+                        selectedWord = null;
+                    }
+                });
+            });
+        }
+
+        function handleWordClick(e, element) {
+            if (gameState[currentLadderIndex].locked) return;
+            e.stopPropagation();
+            resetValidation(element);
+            if (selectedWord === element) {
+                element.classList.remove('selected');
+                selectedWord = null;
+            } else {
+                if (selectedWord) selectedWord.classList.remove('selected');
+                selectedWord = element;
+                element.classList.add('selected');
+            }
+        }
+
+        function resetValidation(el) {
+            el.classList.remove('correct', 'incorrect');
+            el.style.animation = 'none';
+            el.offsetHeight; el.style.animation = null; 
+        }
+
+        // --- Logic & Validation ---
+        function verifyLadder() {
+            const state = gameState[currentLadderIndex];
+            if (state.locked) return;
+
+            let allCorrect = true;
+            let placedCount = 0;
+
+            state.words.forEach(word => {
+                const el = document.querySelector(`[data-id="${word.id}"]`);
+                if (word.location === 'pool') {
+                    allCorrect = false;
+                    return;
+                }
+                placedCount++;
+                let isCorrect = (word.location === word.level);
+                
+                if (el) {
+                    el.classList.remove('correct', 'incorrect');
+                    if (isCorrect) {
+                        el.classList.add('correct');
+                        word.status = 'correct';
+                    } else {
+                        el.classList.add('incorrect');
+                        word.status = 'incorrect';
+                        allCorrect = false;
+                    }
+                }
+            });
+
+            // Lock this ladder
+            state.locked = true;
+            ladderArea.classList.add('locked');
+            btnVerify.disabled = true;
+            btnVerify.textContent = "Ladder Completed";
+            
+            // Disable interactions
+            document.querySelectorAll('.word-pill').forEach(p => { p.draggable = false; p.style.cursor = 'default'; });
+
+            if (allCorrect && placedCount === state.words.length) {
+                confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            }
+
+            checkGlobalCompletion();
+        }
+
+        function checkGlobalCompletion() {
+            const allLocked = gameState.every(s => s.locked);
+            if (allLocked) {
+                btnResults.disabled = false;
+                btnResults.textContent = "View Final Results";
+                btnResults.classList.add('pulse');
+                // Auto-switch visual cue
+                btnResults.style.boxShadow = "0 0 15px #805AD5";
+            }
+        }
+
+        // --- Results View Logic ---
+        function showResultsView() {
+            // Switch Views
+            gameView.classList.add('hidden-view');
+            controlsArea.classList.add('hidden-view');
+            resultsView.classList.remove('hidden-view');
+            
+            // Footer Updates
+            btnVerify.classList.add('hidden-view');
+            btnResults.classList.add('hidden-view');
+            btnDownload.classList.remove('hidden-view');
+
+            // Populate Data
+            const teamName = document.getElementById('teamName').value || "Anonymous";
+            document.getElementById('res-team-name').textContent = "Team: " + teamName;
+
+            let totalWords = 0;
+            let totalCorrect = 0;
+            const mistakes = [];
+
+            const grid = document.getElementById('results-grid');
+            grid.innerHTML = ''; // Clear
+
+            gameState.forEach((state, idx) => {
+                // Calculation
+                state.words.forEach(w => {
+                    totalWords++;
+                    if (w.status === 'correct') totalCorrect++;
+                    else if (w.status === 'incorrect') mistakes.push({ word: w.text, correctLevel: w.level, ladder: ladders[idx].title });
+                });
+
+                // Build Column
+                const col = document.createElement('div');
+                col.className = 'result-column';
+                col.innerHTML = `<div class="result-header">${ladders[idx].title}</div>`;
+                
+                ['extreme', 'strong', 'basic'].forEach(lvl => {
+                    const row = document.createElement('div');
+                    row.className = 'result-cell';
+                    const wordsInLoc = state.words.filter(w => w.location === lvl);
+                    
+                    let html = `<div class="result-cell-label">${lvl.toUpperCase()}</div><div class="result-tags">`;
+                    if (wordsInLoc.length === 0) html += `<span style="color:#CBD5E0; font-size:0.8rem">(Empty)</span>`;
+                    wordsInLoc.forEach(w => {
+                        html += `<span class="res-tag ${w.status}">${w.text}</span>`;
+                    });
+                    html += `</div>`;
+                    row.innerHTML = html;
+                    col.appendChild(row);
+                });
+                grid.appendChild(col);
+            });
+
+            // Score
+            const pct = Math.round((totalCorrect / totalWords) * 100);
+            document.getElementById('res-score-val').textContent = pct + "%";
+
+            // Further Practice Section
+            const practiceDiv = document.createElement('div');
+            practiceDiv.className = 'practice-section';
+            
+            let practiceHTML = `<div class="practice-title">⚠️ For Further Practice (Review These Words)</div>`;
+            if (mistakes.length === 0) {
+                practiceHTML += `<div style="color:var(--success); font-weight:700;">Perfect score! No words needed for review.</div>`;
+            } else {
+                practiceHTML += `<div class="practice-list">`;
+                mistakes.forEach(m => {
+                    practiceHTML += `<div class="practice-item">${m.word} <span style="font-size:0.8em; opacity:0.7">(${m.correctLevel})</span></div>`;
+                });
+                practiceHTML += `</div>`;
+            }
+            practiceDiv.innerHTML = practiceHTML;
+            grid.appendChild(practiceDiv);
+        }
+
+        function downloadReport() {
+            const teamName = document.getElementById('teamName').value || "Results";
+            
+            // Temporarily adjust style for clean print
+            const originalWidth = resultsView.style.maxWidth;
+            resultsView.style.width = "1200px";
+            resultsView.style.maxWidth = "none";
+            
+            html2canvas(resultsView, {
+                scale: 2,
+                backgroundColor: "#ffffff",
+                useCORS: true
+            }).then(canvas => {
+                // Revert styles
+                resultsView.style.width = "";
+                resultsView.style.maxWidth = originalWidth;
+
+                const link = document.createElement('a');
+                link.download = `SynonymLadder_${teamName}_${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }).catch(err => {
+                console.error(err);
+                alert("Error generating image.");
+                resultsView.style.width = "";
+                resultsView.style.maxWidth = originalWidth;
+            });
+        }
+
+        init();
+    </script>
+</body>
+</html>
